@@ -516,7 +516,7 @@ void read_bone_from_file(const std::string& filename)
 			tail.x = atof(strs[5].c_str());
 			tail.y = atof(strs[6].c_str());
 			tail.z = atof(strs[7].c_str());
-			bones.push_back(Bone(name, tail, head));
+			bones.push_back(Bone(name, head, tail));
 		}
 	}
 	bones.shrink_to_fit();
@@ -645,7 +645,6 @@ void add_all_bones()
 	for (int i = 0; i < static_cast<int>(bones.size()); i++) {
 		// add bone
 		add_bone(bones, i);
-		std::cout << "Bone @ " << i << " / " << bones.size() << " = " << bones[i].name << " & " << bone_points.size() << std::endl;
 	}
 }
 
@@ -667,7 +666,7 @@ void add_bone(const std::vector<Bone>& bones, int bone_index)
 	structvec3 current_position = ray_origin;
 
 	// start ray casting
-	for (int i = 0; i < max_grid_num; i++) {
+	for (int i = 0; i < max_grid_num; i++) { // must stop at some arbitrary point or else will infinitely loop...
 		// calculate current voxel indices
 		int current_x = (current_position.x - grid_offset.x) / grid_size;
 		int current_y = (current_position.y - grid_offset.y) / grid_size;
