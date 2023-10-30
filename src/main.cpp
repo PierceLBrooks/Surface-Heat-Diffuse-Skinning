@@ -301,13 +301,17 @@ void diffuse_all_heats()
 
 	std::cout << "Diffusing heats..." << std::endl;
 	for (int i = 0; i < max_grid_num * max_diffuse_loop; i++) {
-		std::cout << "Diffuse pass: " << i << std::endl;
+		std::cout << "Diffuse pass: " << i << " of " << max_grid_num * max_diffuse_loop << std::endl;
 
 		std::vector<std::thread> threads(supported_thread_num);
 
 		// start all threads
-		for (int j = 0; j < supported_thread_num; j++) {
-			threads[j] = std::thread(&VoxelGrid::diffuse_vertex_in_range, this, j, supported_thread_num);
+		if (static_cast<int>(vertices.size()) < supported_thread_num * 2) {
+		    diffuse_vertex_in_range(0, 1);
+		} else {
+		    for (int j = 0; j < supported_thread_num; j++) {
+			    threads[j] = std::thread(&VoxelGrid::diffuse_vertex_in_range, this, j, supported_thread_num);
+		    }
 		}
 
 		// wait for all threads end
@@ -512,7 +516,7 @@ void read_bone_from_file(const std::string& filename)
 			tail.x = atof(strs[5].c_str());
 			tail.y = atof(strs[6].c_str());
 			tail.z = atof(strs[7].c_str());
-			bones.push_back(Bone(name, head, tail));
+			bones.push_back(Bone(name, tail, head));
 		}
 	}
 	bones.shrink_to_fit();
@@ -641,6 +645,7 @@ void add_all_bones()
 	for (int i = 0; i < static_cast<int>(bones.size()); i++) {
 		// add bone
 		add_bone(bones, i);
+		std::cout << "Bone @ " << i << " / " << bones.size() << " = " << bones[i].name << " & " << bone_points.size() << std::endl;
 	}
 }
 
@@ -662,7 +667,7 @@ void add_bone(const std::vector<Bone>& bones, int bone_index)
 	structvec3 current_position = ray_origin;
 
 	// start ray casting
-	while (true) {
+	for (int i = 0; i < max_grid_num; i++) {
 		// calculate current voxel indices
 		int current_x = (current_position.x - grid_offset.x) / grid_size;
 		int current_y = (current_position.y - grid_offset.y) / grid_size;
@@ -1101,8 +1106,14 @@ void calculate_darkness_in_range(const int start, const int block_size)
 void diffuse_vertex_in_range(const int start, const int block_size)
 {
 	// Loop through in the range.
-	for (int i = start; i < static_cast<int>(vertices.size()); i += block_size) {
-		diffuse_vertex(i);
+	if (start == block_size - 1) {
+	    for (int i = static_cast<int>(vertices.size()) - (static_cast<int>(vertices.size()) / block_size); i < static_cast<int>(vertices.size()); i++) {
+		    diffuse_vertex(i);
+	    }
+	} else {
+	    for (int i = 0; i < static_cast<int>(vertices.size()) / block_size; i++) {
+		    diffuse_vertex(i + (start * (static_cast<int>(vertices.size()) / block_size)));
+	    }
 	}
 }
 
@@ -1227,6 +1238,9 @@ float vertex_heat_standard_error()
 void diffuse_vertex(const int index)
 {
 	// reset current ping-pong buffer to accumulate heat from neibours
+	if (index >= static_cast<int>(vertices.size())) {
+	    return;
+	}
 	if (ping_pong) {
 		memset(&vertices[index].bone_heat.pong_heats.front(), 0, vertices[index].bone_heat.pong_heats.size() * sizeof(float));
 	} else {
@@ -1246,10 +1260,16 @@ void diffuse_vertex(const int index)
 
 		if (ping_pong) {
 			for (int j = 0; j < static_cast<int>(vertices[index].bone_heat.pong_heats.size()); j++) {
+			    if (j >= static_cast<int>(vertices[vertices[index].neibours[i]].bone_heat.ping_heats.size())) {
+			        break;
+			    }
 				vertices[index].bone_heat.pong_heats[j] += vertices[vertices[index].neibours[i]].bone_heat.ping_heats[j] * hit_energy;
 			}
 		} else {
 			for (int j = 0; j < static_cast<int>(vertices[index].bone_heat.ping_heats.size()); j++) {
+			    if (j >= static_cast<int>(vertices[vertices[index].neibours[i]].bone_heat.pong_heats.size())) {
+			        break;
+			    }
 				vertices[index].bone_heat.ping_heats[j] += vertices[vertices[index].neibours[i]].bone_heat.pong_heats[j] * hit_energy;
 			}
 		}
@@ -1276,10 +1296,16 @@ void diffuse_vertex(const int index)
 	// provide energy from static heat cache
 	if (ping_pong) {
 		for (int j = 0; j < static_cast<int>(vertices[index].bone_heat.pong_heats.size()); j++) {
+		    if (j >= static_cast<int>(vertices[index].bone_heat.static_heats.size())) {
+		        break;
+		    }
 			vertices[index].bone_heat.pong_heats[j] += vertices[index].bone_heat.static_heats[j];
 		}
 	} else {
 		for (int j = 0; j < static_cast<int>(vertices[index].bone_heat.ping_heats.size()); j++) {
+		    if (j >= static_cast<int>(vertices[index].bone_heat.static_heats.size())) {
+		        break;
+		    }
 			vertices[index].bone_heat.ping_heats[j] += vertices[index].bone_heat.static_heats[j];
 		}
 	}
