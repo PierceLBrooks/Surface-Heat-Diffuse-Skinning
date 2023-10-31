@@ -303,20 +303,20 @@ void diffuse_all_heats()
 	for (int i = 0; i < max_grid_num * max_diffuse_loop; i++) {
 		std::cout << "Diffuse pass: " << i << " of " << max_grid_num * max_diffuse_loop << std::endl;
 
-		std::vector<std::thread> threads(supported_thread_num);
-
-		// start all threads
 		if (static_cast<int>(vertices.size()) < supported_thread_num * 2) {
 		    diffuse_vertex_in_range(0, 1);
 		} else {
+		    std::vector<std::thread> threads(supported_thread_num);
+
+		    // start all threads
 		    for (int j = 0; j < supported_thread_num; j++) {
 			    threads[j] = std::thread(&VoxelGrid::diffuse_vertex_in_range, this, j, supported_thread_num);
 		    }
-		}
 
-		// wait for all threads end
-		for (int j = 0; j < supported_thread_num; j++) {
-			threads[j].join();
+		    // wait for all threads end
+		    for (int j = 0; j < supported_thread_num; j++) {
+			    threads[j].join();
+		    }
 		}
 
 		// flip ping pong
